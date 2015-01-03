@@ -13,26 +13,47 @@ class HTTPHandler(BaseHTTPRequestHandler):
         return d
 
 class ButtonServer():
-    def __init__(self, port=8000):
+    def __init__(self, callback, port=8000):
+        self.callback=callback
         self.buttons=dict()
         self.textboxes=dict()
         self.xtrahtml=""
-        self.port = port
-        self.server = None
+        self.port=port
+        self.server=None
 	
-    def add_button(self, name, callback, newhtml=""):
-        if not hasattr(callback, '__call__'):
-    	    raise TypeError("fn not callable!")
-	self.buttons[name]=callback
+    def add_button(self, name, html_attribute_string=""):
+	self.buttons[name]=html_attribute_string
 
-    def add_textbox(self, name, inittext=""):
-        self.textboxes[name]=inittext
+    def add_textbox(self, name, html_attribute_string=""):
+        self.textboxes[name]=html_attribute_string
     
+    def add_html(self, html):
+        self.xtrahtml=html
+
+    def button_html_string(self):
+        s=""
+        for e in self.buttons.keys():
+            s+=str("""<button type='button' id='%s' %s>%s</button>""" % (e, self.buttons[e], e))
+        return s
+
+    def textbox_html_string(self):
+        s=""
+        for e in self.textboxes.keys():
+            s+=str("""<input id='%s' type='text' %s>""" % (e, self.textboxes[e]))
+        print s
+        return s
 
     def html_string(self):
-        html= """
+        tb=[]
+        for e in self.textboxes.keys():
+            tb.append('"&%s="+document.getElementById("%s").value' % (e, e))
+        tb = "var tbs=" + "+".join(tb) + ";"
+        el=""
+        for e in self.buttons.keys():
+            el+='document.getElementById("%s").addEventListener("click", ajax);' % (e)
+        html=  """
         <script>
-        function ajax(button_name)
+        function ajax(evt)
         {
         var xmlhttp;
         if (window.XMLHttpRequest)
@@ -43,37 +64,13 @@ class ButtonServer():
         {// code for IE6, IE5
             xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
         }
-        var tbs="";
-        xmlhttp.onreadystatechange=function()
-        {
-            if (xmlhttp.readyState==4 && xmlhttp.status==200)
-            {
-                var key;
-                obj=JSON.parse(xmlhttp.responseText);
-                for(key in obj.textboxes)
-                {
-                    if(obj.textboxes.hasOwnProperty(key))
-                    {
-                        var name = obj.textboxes[key].name
-                        tbs+=("&" + name + "=" + document.getElementById(name).value);
-                    }
-                }
-            xmlhttp.open("GET","ajax?action="+button_name+tbs,true);
-            xmlhttp.send();
-            }
-        }
-        xmlhttp.open("GET","tbnames",true);
+        """ + tb + """
+        xmlhttp.open("GET", "ajax?action="+evt.target.id+tbs, true);
         xmlhttp.send();
         }
-        </script>"""
-
-        but=""
-        tb=""
-        for e in self.buttons.keys():
-            but+=str("""<button type='button' value='%s' name='action' onclick='ajax("%s")'>%s</button>""" % (e, e, e))
-        for e in self.textboxes.keys():
-            tb+=str("""<input id='%s' type='text' name='%s' value='%s'>""" % (e, e, self.textboxes[e]))
-        return html + "<form action='.' method='GET'>" + but + tb + "</form>"
+        """ + el + "</script>"
+        
+        return "<form action='.' method='GET'>" + self.button_html_string() + self.textbox_html_string() + "</form>" + self.xtrahtml + html
 	
     def run(self):
         def get(self):
@@ -88,22 +85,8 @@ class ButtonServer():
                 self.wfile.write("")
 #########################CALL BUTTON FUNCTION###########################
                 qs=self.query_string()
-                fn=self.buttons.get(qs.pop('action'))
-                if hasattr(fn, '__call__'):
-                    fn(qs)
-                return
-
-            if basename(self.path)=="tbnames":
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-
-                jsonstr=[]
-                for e in self.textboxes.keys():
-                    jsonstr.append(str('{"name":"%s"}' % (e)))
-                jsonstr='{"textboxes":[' + ",".join(jsonstr) + ']}'
-
-                self.wfile.write(jsonstr)
+                if hasattr(self.callback[0], '__call__'):
+                    self.callback[0](qs)
                 return
 #########################SEND RESPONSE PAGE#############################
             self.send_response(200)
@@ -112,11 +95,14 @@ class ButtonServer():
             self.wfile.write(self.html_string())
             return
 
-
+        HTTPHandler.callback=[self.callback]
         HTTPHandler.do_GET=get
         HTTPHandler.html_string=self.html_string
+        HTTPHandler.xtrahtml=self.xtrahtml
         HTTPHandler.textboxes=self.textboxes
         HTTPHandler.buttons=self.buttons
+        HTTPHandler.button_html_string=self.button_html_string
+        HTTPHandler.textbox_html_string=self.textbox_html_string
 
 
         try:
@@ -132,11 +118,11 @@ class ButtonServer():
             self.server.socket.close()
 
 if __name__=='__main__':
-	b=ButtonServer()
 	def p(qs):
 		print "BUTTON PRESSED", qs
-	b.add_button("Up", p)
-	b.add_button("Down", p)
-        b.add_textbox("tb", "yo")
-        b.add_textbox("tb2", "howdy")
+	b=ButtonServer(p)
+	b.add_button("Up", 'style="position: absolute; top: 0px; left: 0px;width: 60px;"')
+	b.add_button("Down", 'style="position: absolute; top: 20px; left: 0px; width: 60px;"')
+        b.add_textbox("tb", 'style="position: absolute; left: 200px; top: 0px"')
+        b.add_textbox("tb2", 'style="position: absolute; top: 0px; left: 60px"')
 	b.run()
