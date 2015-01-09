@@ -44,10 +44,12 @@ class ButtonServer():
         return s
 
     def html_string(self):
-        tb=[]
-        for e in self.textboxes.keys():
-            tb.append('"&%s="+document.getElementById("%s").value' % (e, e))
-        tb = "var tbs=" + "+".join(tb) + ";"
+        tbs='var tbs=""'
+        if len(self.textboxes)>0:
+            tb=[]
+            for e in self.textboxes.keys():
+                tb.append('"&%s="+document.getElementById("%s").value' % (e, e))
+            tbs = "var tbs=" + "+".join(tb) + ";"
         el=""
         for e in self.buttons.keys():
             el+='document.getElementById("%s").addEventListener("click", ajax);' % (e)
@@ -64,7 +66,7 @@ class ButtonServer():
         {// code for IE6, IE5
             xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
         }
-        """ + tb + """
+        """ + tbs + """
         xmlhttp.open("GET", "ajax?action="+evt.target.id+tbs, true);
         xmlhttp.send();
         }
