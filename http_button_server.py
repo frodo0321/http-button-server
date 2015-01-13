@@ -1,16 +1,10 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from socket import socket, AF_INET, SOCK_DGRAM
 from os.path import basename, splitext
+import urlparse
 
 class HTTPHandler(BaseHTTPRequestHandler):
-
-    def query_string(self):
-        d=dict()
-        if "?" in self.path:
-            for e in self.path[self.path.index('?')+1:].split('&'):
-                var, val=e.split('=')
-                d[var]=val
-        return d
+    pass
 
 class ButtonServer():
     def __init__(self, callback, port=8000):
@@ -86,7 +80,7 @@ class ButtonServer():
                 self.end_headers()
                 self.wfile.write("")
 #########################CALL BUTTON FUNCTION###########################
-                qs=self.query_string()
+                qs=urlparse.parse_qs(urlparse.urlparse(self.path)[4])
                 if hasattr(self.callback[0], '__call__'):
                     self.callback[0](qs)
                 return
